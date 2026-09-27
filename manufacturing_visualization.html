@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manufacturing Analysis Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #111b2d;
+      --panel-2: #15243c;
+      --text: #e5edf9;
+      --muted: #9fb5d2;
+      --primary: #4ecdc4;
+      --secondary: #5dade2;
+      --warning: #f7b267;
+      --danger: #ef6f6c;
+      --success: #7bd389;
+      --grid: rgba(255,255,255,0.07);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: linear-gradient(180deg, #0b1220 0%, #101c2f 100%);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 2.5vw, 2.7rem);
+      letter-spacing: 0.02em;
+    }
+
+    .title-block p {
+      margin: 8px 0 0;
+      color: var(--muted);
+    }
+
+    .filters {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: rgba(17, 27, 45, 0.8);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .filters label {
+      display: flex;
+      flex-direction: column;
+      color: var(--muted);
+      font-size: 12px;
+      gap: 6px;
+    }
+
+    select {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 14px;
+      min-width: 140px;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: rgba(17, 27, 45, 0.9);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+
+    .kpi-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .kpi-value {
+      margin-top: 14px;
+      font-size: clamp(1.7rem, 2vw, 2.5rem);
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .kpi-sub {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .charts {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 18px;
+    }
+
+    .chart-panel {
+      background: rgba(17, 27, 45, 0.9);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 16px 18px 10px;
+      min-height: 320px;
+    }
+
+    .chart-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+    }
+
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 980px) {
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .charts, .bottom-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 600px) {
+      .container { padding: 16px; }
+      .kpis { grid-template-columns: 1fr; }
+      .filters { width: 100%; }
+      .filters label { width: 100%; }
+      select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title-block">
+        <h1>Manufacturing Analysis Dashboard</h1>
+        <p>Operational quality, defects, and production efficiency</p>
+      </div>
+
+      <div class="filters">
+        <label>
+          Plant
+          <select id="plantFilter">
+            <option value="All">All plants</option>
+          </select>
+        </label>
+
+        <label>
+          Product
+          <select id="productFilter">
+            <option value="All">All products</option>
+          </select>
+        </label>
+
+        <label>
+          Shift
+          <select id="shiftFilter">
+            <option value="All">All shifts</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="card">
+        <div class="kpi-label">Total Produced</div>
+        <div id="totalProduced" class="kpi-value">0</div>
+        <div class="kpi-sub">Units completed</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Avg Efficiency</div>
+        <div id="avgEfficiency" class="kpi-value">0%</div>
+        <div class="kpi-sub">Across all records</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Defects</div>
+        <div id="totalDefects" class="kpi-value">0</div>
+        <div class="kpi-sub">Rejected / defect units</div>
+      </div>
+
+      <div class="card">
+        <div class="kpi-label">Quality Status</div>
+        <div id="qualityStatus" class="kpi-value">0%</div>
+        <div class="kpi-sub">Pass rate</div>
+      </div>
+    </div>
+
+    <div class="charts">
+      <div class="chart-panel">
+        <div class="chart-title">Production trend by date</div>
+        <div class="chart-wrap">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="chart-title">Plant performance</div>
+        <div class="chart-wrap">
+          <canvas id="plantChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="chart-panel">
+        <div class="chart-title">Quality status mix</div>
+        <div class="chart-wrap">
+          <canvas id="qualityChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-panel">
+        <div class="chart-title">Shift efficiency</div>
+        <div class="chart-wrap">
+          <canvas id="shiftChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const csvUrl = 'manufacturing_analysis_cleaned.csv';
+    let allData = [];
+
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/).filter(Boolean);
+      if (!lines.length) return [];
+
+      const headers = lines[0].split(',').map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const row = {};
+        headers.forEach((header, i) => {
+          row[header] = values[i] ? values[i].trim() : '';
+        });
+        return row;
+      });
+    }
+
+    function safeNumber(value) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function getUniqueValues(key) {
+      return [...new Set(allData.map(row => row[key]).filter(Boolean))].sort();
+    }
+
+    function populateFilters() {
+      const plantOptions = ['All', ...getUniqueValues('plant')];
+      const productOptions = ['All', ...getUniqueValues('product')];
+      const shiftOptions = ['All', ...getUniqueValues('shift')];
+
+      fillSelect('plantFilter', plantOptions);
+      fillSelect('productFilter', productOptions);
+      fillSelect('shiftFilter', shiftOptions);
+    }
+
+    function fillSelect(id, values) {
+      const select = document.getElementById(id);
+      select.innerHTML = values
+        .map(v => `<option value="${v}">${v === 'All' ? 'All' : v}</option>`)
+        .join('');
+    }
+
+    function filteredData() {
+      const plant = document.getElementById('plantFilter').value;
+      const product = document.getElementById('productFilter').value;
+      const shift = document.getElementById('shiftFilter').value;
+
+      return allData.filter(row => {
+        const matchesPlant = plant === 'All' || row.plant === plant;
+        const matchesProduct = product === 'All' || row.product === product;
+        const matchesShift = shift === 'All' || row.shift === shift;
+        return matchesPlant && matchesProduct && matchesShift;
+      });
+    }
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat('en-US').format(value);
+    }
+
+    function drawKpis(data) {
+      const totalProduced = data.reduce((sum, row) => sum + safeNumber(row.produced_quantity), 0);
+      const totalDefects = data.reduce((sum, row) => sum + safeNumber(row.defect_quantity), 0);
+      const avgEfficiency = data.length ? data.reduce((sum, row) => sum + safeNumber(row.production_efficiency), 0) / data.length : 0;
+      const passCount = data.filter(row => String(row.quality_status).toLowerCase() === 'pass').length;
+      const qualityRate = data.length ? (passCount / data.length) * 100 : 0;
+
+      document.getElementById('totalProduced').textContent = formatNumber(totalProduced);
+      document.getElementById('avgEfficiency').textContent = avgEfficiency.toFixed(1) + '%';
+      document.getElementById('totalDefects').textContent = formatNumber(totalDefects);
+      document.getElementById('qualityStatus').textContent = qualityRate.toFixed(1) + '%';
+    }
+
+    function buildTrendChart(data) {
+      const grouped = {};
+      data.forEach(row => {
+        const date = row.date;
+        if (!grouped[date]) grouped[date] = 0;
+        grouped[date] += safeNumber(row.produced_quantity);
+      });
+
+      const labels = Object.keys(grouped).sort();
+      const values = labels.map(label => grouped[label]);
+
+      return new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Produced Quantity',
+            data: values,
+            borderColor: '#4ecdc4',
+            backgroundColor: 'rgba(78,205,196,0.15)',
+            fill: true,
+            tension: 0.25,
+            borderWidth: 2,
+            pointRadius: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#c8d6ea' },
+              grid: { color: 'rgba(255,255,255,0.08)' }
+            },
+            y: {
+              ticks: { color: '#c8d6ea' },
+              grid: { color: 'rgba(255,255,255,0.08)' }
+            }
+          }
+        }
+      });
+    }
+
+    function buildPlantChart(data) {
+      const grouped = {};
+      data.forEach(row => {
+        const plant = row.plant;
+        if (!grouped[plant]) grouped[plant] = 0;
+        grouped[plant] += safeNumber(row.produced_quantity);
+      });
+
+      const labels = Object.keys(grouped);
+      const values = Object.values(grouped);
+
+      return new Chart(document.getElementById('plantChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Production',
+            data: values,
+            backgroundColor: ['#4ecdc4', '#5dade2', '#f7b267', '#ef6f6c'],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              ticks: { color: '#c8d6ea' },
+              grid: { display: false }
+            },
+            y: {
+              ticks: { color: '#c8d6ea' },
+              grid: { color: 'rgba(255,255,255,0.08)' }
+            }
+          }
+        }
+      });
+    }
+
+    function buildQualityChart(data) {
+      const counts = { Pass: 0, Conditional: 0, Fail: 0 };
+      data.forEach(row => {
+        const status = row.quality_status || 'Fail';
+        if (counts[status] !== undefined) counts[status] += 1;
+      });
+
+      return new Chart(document.getElementById('qualityChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Pass', 'Conditional', 'Fail'],
+          datasets: [{
+            data: [counts.Pass, counts.Conditional, counts.Fail],
+            backgroundColor: ['#7bd389', '#f7b267', '#ef6f6c'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#dfeaf9' } } }
+        }
+      });
+    }
+
+    function buildShiftChart(data) {
+      const grouped = {};
+      data.forEach(row => {
+        const shift = row.shift;
+        if (!grouped[shift]) grouped[shift] = [];
+        grouped[shift].push(safeNumber(row.production_efficiency));
+      });
+
+      const labels = Object.keys(grouped);
+      const values = labels.map(shift => {
+        const arr = grouped[shift];
+        return arr.reduce((sum, item) => sum + item, 0) / arr.length;
+      });
+
+      return new Chart(document.getElementById('shiftChart'), {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Efficiency %',
+            data: values,
+            backgroundColor: 'rgba(93,173,226,0.2)',
+            borderColor: '#5dade2',
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              min: 0,
+              max: 120,
+              grid: { color: 'rgba(255,255,255,0.1)' },
+              angleLines: { color: 'rgba(255,255,255,0.1)' },
+              pointLabels: { color: '#dfeaf9' },
+              ticks: { color: '#dfeaf9' }
+            }
+          }
+        }
+      });
+    }
+
+    function renderDashboard() {
+      const data = filteredData();
+      drawKpis(data);
+
+      const trendChart = buildTrendChart(data);
+      const plantChart = buildPlantChart(data);
+      const qualityChart = buildQualityChart(data);
+      const shiftChart = buildShiftChart(data);
+
+      window.dashboardCharts = { trendChart, plantChart, qualityChart, shiftChart };
+    }
+
+    function refreshDashboard() {
+      if (!window.dashboardCharts) return;
+      const charts = Object.values(window.dashboardCharts);
+      charts.forEach(chart => chart.destroy());
+      renderDashboard();
+    }
+
+    async function loadData() {
+      try {
+        const response = await fetch(csvUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        allData = parseCSV(text);
+        populateFilters();
+        renderDashboard();
+
+        ['plantFilter', 'productFilter', 'shiftFilter'].forEach(id => {
+          document.getElementById(id).addEventListener('change', refreshDashboard);
+        });
+      } catch (error) {
+        document.body.innerHTML = `
+          <div style="padding:24px;color:#fff;font-family:Arial,sans-serif;">
+            <h2>Dashboard failed to load</h2>
+            <p>Make sure the CSV file is in the same folder and served from a local web server.</p>
+            <p>Error: ${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
